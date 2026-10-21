@@ -11,6 +11,14 @@ Streaming Korean speech-to-text for [Pipecat](https://github.com/pipecat-ai/pipe
 RTZR's `sommers_ko` model is tuned for Korean telephone audio (8 kHz), which makes it a good fit
 for call-center voice agents.
 
+## Demo
+
+[Watch the 32-second demo](https://github.com/jhwanseok/pipecat-rtzr/releases/download/v0.1.0/pipecat-rtzr-demo.mp4):
+synthesized Korean speech streamed through the live RTZR API in real time. Interim results update
+as each sentence is spoken, utterances close by server end-point detection, and the last one,
+cut off mid-word, is closed by `Finalize` about 30 ms after the VAD reports the end of speech.
+The video is built with [`scripts/make_demo.py`](scripts/make_demo.py).
+
 ## Installation
 
 ```bash
