@@ -3,8 +3,10 @@
 Streaming Korean speech-to-text for [Pipecat](https://github.com/pipecat-ai/pipecat), using the
 [RTZR (Return Zero) VITO](https://developers.rtzr.ai/docs/en/) WebSocket API.
 
-> Status: **pre-release (0.1.0.dev0)**. Tested against an in-process mock of the RTZR API and
-> Pipecat 1.13.0. It has **not yet been run against the live RTZR service**.
+> Status: **pre-release (0.1.0.dev0)**. Unit and mock-server tests run without credentials.
+> Streaming, `Finalize`, `EOS`, token refresh and reconnect were checked against the live RTZR
+> service on 2026-10-21 with short synthesized Korean clips (see `scripts/live_check.py`).
+> Not yet tried with real telephone audio or long calls.
 
 RTZR's `sommers_ko` model is tuned for Korean telephone audio (8 kHz), which makes it a good fit
 for call-center voice agents.
@@ -55,7 +57,10 @@ See [`example.py`](example.py) for a complete bot, and
 - The access token is cached and refreshed before it expires. A rejected handshake (HTTP 401)
   fetches a new token and retries once.
 - Idle connections are kept alive with silent audio (RTZR closes sockets after 60 s without audio).
-- On shutdown the service sends `EOS` so the last utterance is flushed.
+- On shutdown the service sends `EOS` so the last utterance is flushed, and waits up to
+  `eos_flush_timeout` seconds (default 2) for its final transcript when one is still open.
+- If the socket drops, the service reconnects automatically. Audio of the utterance that was in
+  progress when the socket dropped is not replayed, so that utterance is lost.
 - Changing a setting at runtime reconnects the stream.
 
 ### Settings
@@ -84,7 +89,7 @@ ruff check . && ruff format --check .
 
 ## Compatibility
 
-Tested with Pipecat 1.13.0 and Python 3.12.
+Tested with Pipecat 1.13.0 and Python 3.12 (Windows).
 
 ## License
 
