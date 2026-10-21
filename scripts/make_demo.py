@@ -26,12 +26,13 @@ import time
 import wave
 from pathlib import Path
 
-# (text, cut_seconds): cut_seconds stops the audio mid-sentence, so only Finalize can close it
+# (text, cut_seconds, heard): cut_seconds stops the audio mid-sentence, so the server has no
+# end-point to find and only Finalize can close the utterance; `heard` is what was actually played
 SCRIPT = [
-    ("안녕하세요. 리턴제로 음성 인식 데모입니다.", None),
-    ("내일 오후 세 시에 상담 예약을 하고 싶어요.", None),
-    ("전화번호는 공일공 일이삼사 오육칠팔 입니다.", None),
-    ("통화가 중간에 끊겨도 발화를 확정합니다.", 2.3),
+    ("안녕하세요. 리턴제로 음성 인식 데모입니다.", None, None),
+    ("내일 오후 세 시에 상담 예약을 하고 싶어요.", None, None),
+    ("전화번호는 공일공 일이삼사 오육칠팔 입니다.", None, None),
+    ("통화가 중간에 끊겨도 발화를 확정합니다.", 2.3, "통화가 중간에 끊겨도 발화를 확"),
 ]
 INTRO_S = 5.0
 OUTRO_S = 7.0
@@ -93,7 +94,7 @@ def synth(out: Path) -> None:
         "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer",
         "$s.SelectVoice('Microsoft Heami Desktop')",
     ]
-    for i, (text, _cut) in enumerate(SCRIPT):
+    for i, (text, _cut, _heard) in enumerate(SCRIPT):
         for hz in (8000, 16000):
             target = str((out / f"s{i}-{hz}.wav").resolve())
             lines += [
@@ -263,8 +264,16 @@ class Renderer:
         self.latency: list[int | None] = []
         for i, seg in enumerate(self.timeline):
             finals = [e for e in self.events if e["kind"] == "final" and self._in_window(i, e["t"])]
-            # a cut-off sentence has no end-point for the server to find: measure from the VAD stop
-            ref = seg["clip_end"] + VAD_STOP_AFTER_S if seg["cut"] else seg["end"]
+            if seg["cut"]:
+                # no end-point for the server to find: measure from the VAD stop that sent Finalize
+                stops = [
+                    e["t"]
+                    for e in self.events
+                    if e["kind"] == "vad_stop" and self._in_window(i, e["t"])
+                ]
+                ref = stops[-1] if stops else seg["clip_end"] + VAD_STOP_AFTER_S
+            else:
+                ref = seg["end"]
             self.latency.append(round((finals[-1]["t"] - ref) * 1000) if finals else None)
         self.content_end = max([e["t"] for e in self.events] + [self.duration]) + TAIL_S
         self.t_end = INTRO_S + self.content_end + OUTRO_S
@@ -366,12 +375,17 @@ class Renderer:
                 width=2,
             )
             d.text((68, y + 12), f"{i + 1}.  원문", font=self.f_small, fill=DIM)
-            d.text(
-                (170, y + 6),
-                seg["text"],
-                font=self.f_mid,
-                fill=TEXT if speaking or t > seg["end"] else DIM,
-            )
+            shown = SCRIPT[i][2] or seg["text"]
+            fill = TEXT if speaking or t > seg["end"] else DIM
+            d.text((170, y + 6), shown + ("…" if seg["cut"] else ""), font=self.f_mid, fill=fill)
+            if seg["cut"]:
+                x = 170 + d.textlength(shown + "…  ", font=self.f_mid)
+                d.text(
+                    (x, y + 12),
+                    "[음성 끊김 · audio cut mid-word]",
+                    font=self.f_small,
+                    fill=(251, 146, 60) if t > seg["end"] - 0.3 else DIM,
+                )
 
             d.text((68, y + 46), "인식", font=self.f_small, fill=DIM)
             if committed:
@@ -386,9 +400,12 @@ class Renderer:
                 d.text((170, y + 82), "interim (updating)", font=self.f_small, fill=INTERIM)
             elif committed and lat is not None:
                 if seg["cut"]:
-                    note = f"final  +{lat} ms after Finalize (audio was cut off, no end-point)"
+                    note = (
+                        f"final by Finalize  +{lat} ms after VAD stop "
+                        "(server end-point not reached)"
+                    )
                 else:
-                    note = f"final  +{lat} ms after speech end"
+                    note = f"final by server end-point  +{lat} ms after speech end"
                 d.text((170, y + 82), note, font=self.f_small, fill=FINAL)
             y += box_h + 10
 
