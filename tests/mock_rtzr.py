@@ -34,7 +34,9 @@ class MockRTZR:
     audio_bytes: int = 0
     text_messages: list[str] = field(default_factory=list)
     tokens_issued: int = 0
+    flush_on_eos: bool = True
     _chunks: int = 0
+    _open: bool = False
 
     async def authenticate(self, request: web.Request) -> web.Response:
         form = await request.post()
@@ -69,10 +71,14 @@ class MockRTZR:
                 self.audio_bytes += len(msg.data)
                 self._chunks += 1
                 if self._chunks % self.interim_every_n_chunks == 0:
+                    self._open = True
                     await ws.send_str(self._payload(seq, False, self.interim_text))
             elif msg.type == WSMsgType.TEXT:
                 self.text_messages.append(msg.data)
                 if msg.data == "EOS":
+                    if self._open and self.flush_on_eos:
+                        await ws.send_str(self._payload(seq, True, self.final_text))
+                        self._open = False
                     await ws.close()
                     break
                 try:
@@ -80,6 +86,7 @@ class MockRTZR:
                 except json.JSONDecodeError:
                     continue
                 if command.get("type") == "Finalize":
+                    self._open = False
                     await ws.send_str(self._payload(seq, True, self.final_text))
                     seq += 1
         return ws

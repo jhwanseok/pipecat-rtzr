@@ -1,5 +1,6 @@
 """RTZR (Return Zero) VITO streaming speech-to-text service for Pipecat."""
 
+import asyncio
 import json
 import os
 from collections.abc import AsyncGenerator, Iterable
@@ -149,6 +150,7 @@ class RTZRSTTService(WebsocketSTTService):
         api_base: str = DEFAULT_API_BASE,
         sample_rate: int | None = None,
         vad_force_finalize: bool = True,
+        eos_flush_timeout: float = 2.0,
         settings: Settings | None = None,
         ttfs_p99_latency: float | None = None,
         **kwargs,
@@ -161,6 +163,8 @@ class RTZRSTTService(WebsocketSTTService):
             api_base: Base URL of the RTZR OpenAPI. The WebSocket URL is derived from it.
             sample_rate: Input sample rate (8000-48000). Taken from the pipeline when omitted.
             vad_force_finalize: Send ``Finalize`` when the VAD reports the end of speech.
+            eos_flush_timeout: Seconds to wait for the last transcript after ``EOS`` on shutdown,
+                when an utterance is still open. ``0`` closes right after sending ``EOS``.
             settings: Runtime-updatable settings.
             ttfs_p99_latency: P99 time from end of speech to the final transcript, in seconds.
                 Measure it for your deployment with the Pipecat STT benchmark.
@@ -200,7 +204,11 @@ class RTZRSTTService(WebsocketSTTService):
 
         self._auth = RTZRAuth(client_id, client_secret, api_base=api_base)
         self._vad_force_finalize = vad_force_finalize
+        self._eos_flush_timeout = eos_flush_timeout
         self._receive_task = None
+        # True between an interim result and the final that closes it.
+        self._utterance_open = False
+        self._final_received = asyncio.Event()
 
     def can_generate_metrics(self) -> bool:
         """Whether this service reports processing metrics.
@@ -251,6 +259,13 @@ class RTZRSTTService(WebsocketSTTService):
             frame: The end frame.
         """
         await self._send_eos()
+        if self._utterance_open and self._eos_flush_timeout > 0:
+            # RTZR flushes the open utterance on EOS; give the final a moment to arrive.
+            self._final_received.clear()
+            try:
+                await asyncio.wait_for(self._final_received.wait(), self._eos_flush_timeout)
+            except TimeoutError:
+                logger.debug(f"{self}: no final transcript after EOS")
         await super().stop(frame)
 
     async def cancel(self, frame: CancelFrame):
@@ -395,6 +410,7 @@ class RTZRSTTService(WebsocketSTTService):
             await self.push_error(error_msg=f"Error closing RTZR websocket: {e}", exception=e)
         finally:
             self._websocket = None
+            self._utterance_open = False
             await self._call_event_handler("on_disconnected")
 
     def _get_websocket(self):
@@ -427,6 +443,8 @@ class RTZRSTTService(WebsocketSTTService):
 
         language = self._result_language()
         if data.get("final"):
+            self._utterance_open = False
+            self._final_received.set()
             self.confirm_finalize()
             await self.emit_stt_usage_metrics()
             await self.push_frame(
@@ -440,6 +458,7 @@ class RTZRSTTService(WebsocketSTTService):
             )
             await self._handle_transcription(text, is_final=True, language=language)
         else:
+            self._utterance_open = True
             await self.push_frame(
                 InterimTranscriptionFrame(
                     text=text,
