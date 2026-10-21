@@ -14,27 +14,58 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: BSD License",
+  "Natural Language :: Korean",
+  "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
 ]
 dependencies = [
   "pipecat-ai>=1.13.0,<2",
   "aiohttp>=3.9",
 ]
 
+[project.urls]
+Homepage = "https://github.com/jhwanseok/pipecat-rtzr"
+Repository = "https://github.com/jhwanseok/pipecat-rtzr"
+Issues = "https://github.com/jhwanseok/pipecat-rtzr/issues"
+Changelog = "https://github.com/jhwanseok/pipecat-rtzr/blob/main/CHANGELOG.md"
+
 [dependency-groups]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6", "mypy>=1.11"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pipecat_rtzr"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests/unit", "tests/integration"]
+addopts = ["-ra", "--strict-markers"]
+markers = [
+  "live: calls the real RTZR API (needs RTZR_CLIENT_ID/RTZR_CLIENT_SECRET); deselect with -m 'not live'",
+]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pipecat_rtzr"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+no_implicit_optional = true

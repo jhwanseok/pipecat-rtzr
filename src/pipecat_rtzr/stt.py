@@ -140,7 +140,7 @@ class RTZRSTTService(WebsocketSTTService):
     """
 
     Settings = RTZRSTTSettings
-    _settings: Settings
+    _settings: RTZRSTTSettings
 
     def __init__(
         self,
@@ -151,7 +151,7 @@ class RTZRSTTService(WebsocketSTTService):
         sample_rate: int | None = None,
         vad_force_finalize: bool = True,
         eos_flush_timeout: float = 2.0,
-        settings: Settings | None = None,
+        settings: RTZRSTTSettings | None = None,
         ttfs_p99_latency: float | None = None,
         **kwargs,
     ):
@@ -205,7 +205,7 @@ class RTZRSTTService(WebsocketSTTService):
         self._auth = RTZRAuth(client_id, client_secret, api_base=api_base)
         self._vad_force_finalize = vad_force_finalize
         self._eos_flush_timeout = eos_flush_timeout
-        self._receive_task = None
+        self._receive_task: asyncio.Task | None = None
         # True between an interim result and the final that closes it.
         self._utterance_open = False
         self._final_received = asyncio.Event()
@@ -229,7 +229,7 @@ class RTZRSTTService(WebsocketSTTService):
         """
         return language_to_rtzr_language(language)
 
-    async def _update_settings(self, delta: Settings) -> dict[str, Any]:
+    async def _update_settings(self, delta: RTZRSTTSettings) -> dict[str, Any]:  # type: ignore[override]
         """Apply a settings delta and reconnect, since RTZR reads settings from the URL.
 
         Args:
@@ -243,7 +243,7 @@ class RTZRSTTService(WebsocketSTTService):
             await self._request_reconnect()
         return changed
 
-    async def setup(self, setup: FrameProcessorSetup):
+    async def setup(self, setup: FrameProcessorSetup):  # type: ignore[override]
         """Set up the service and open the connection.
 
         Args:
