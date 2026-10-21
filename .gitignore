@@ -7,3 +7,4 @@ dist/
 .ruff_cache/
 *.wav
 *.mp3
+demo-out/
