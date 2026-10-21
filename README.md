@@ -3,7 +3,7 @@
 Streaming Korean speech-to-text for [Pipecat](https://github.com/pipecat-ai/pipecat), using the
 [RTZR (Return Zero) VITO](https://developers.rtzr.ai/docs/en/) WebSocket API.
 
-> Status: **pre-release (0.1.0.dev0)**. Unit and mock-server tests run without credentials.
+> Status: **alpha (0.1.0)**. Unit and mock-server tests run without credentials.
 > Streaming, `Finalize`, `EOS`, token refresh and reconnect were checked against the live RTZR
 > service on 2026-10-21 with short synthesized Korean clips (see `scripts/live_check.py`).
 > Not yet tried with real telephone audio or long calls.

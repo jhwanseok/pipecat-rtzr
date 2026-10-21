@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pipecat-rtzr"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "RTZR (Return Zero) VITO streaming Korean speech-to-text service for Pipecat"
 readme = "README.md"
 requires-python = ">=3.11"
