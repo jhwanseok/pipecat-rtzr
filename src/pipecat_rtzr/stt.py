@@ -1,5 +1,6 @@
 """RTZR (Return Zero) VITO streaming speech-to-text service for Pipecat."""
 
+import asyncio
 import json
 import os
 from collections.abc import AsyncGenerator, Iterable
@@ -139,7 +140,7 @@ class RTZRSTTService(WebsocketSTTService):
     """
 
     Settings = RTZRSTTSettings
-    _settings: Settings
+    _settings: RTZRSTTSettings
 
     def __init__(
         self,
@@ -149,7 +150,7 @@ class RTZRSTTService(WebsocketSTTService):
         api_base: str = DEFAULT_API_BASE,
         sample_rate: int | None = None,
         vad_force_finalize: bool = True,
-        settings: Settings | None = None,
+        settings: RTZRSTTSettings | None = None,
         ttfs_p99_latency: float | None = None,
         **kwargs,
     ):
@@ -200,7 +201,7 @@ class RTZRSTTService(WebsocketSTTService):
 
         self._auth = RTZRAuth(client_id, client_secret, api_base=api_base)
         self._vad_force_finalize = vad_force_finalize
-        self._receive_task = None
+        self._receive_task: asyncio.Task | None = None
 
     def can_generate_metrics(self) -> bool:
         """Whether this service reports processing metrics.
@@ -221,7 +222,7 @@ class RTZRSTTService(WebsocketSTTService):
         """
         return language_to_rtzr_language(language)
 
-    async def _update_settings(self, delta: Settings) -> dict[str, Any]:
+    async def _update_settings(self, delta: RTZRSTTSettings) -> dict[str, Any]:  # type: ignore[override]
         """Apply a settings delta and reconnect, since RTZR reads settings from the URL.
 
         Args:
@@ -235,7 +236,7 @@ class RTZRSTTService(WebsocketSTTService):
             await self._request_reconnect()
         return changed
 
-    async def setup(self, setup: FrameProcessorSetup):
+    async def setup(self, setup: FrameProcessorSetup):  # type: ignore[override]
         """Set up the service and open the connection.
 
         Args:
